@@ -21,6 +21,14 @@ const progressFill = $('#progressFill');
 const progressText = $('#progressText');
 const progressStatus = $('#progressStatus');
 
+const updateBanner = $('#updateBanner');
+const updateBannerText = $('#updateBannerText');
+const updateBannerBtn = $('#updateBannerBtn');
+const updateBannerClose = $('#updateBannerClose');
+const appVersionEl = $('#appVersion');
+const checkUpdateBtn = $('#checkUpdateBtn');
+const checkUpdateStatus = $('#checkUpdateStatus');
+
 const modeTabs = $('#modeTabs');
 const singleMode = $('#singleMode');
 const batchMode = $('#batchMode');
@@ -349,6 +357,100 @@ async function processQueueItem(url) {
     rowCtl.setStatus('error', '❌ ' + err.message);
   }
 }
+
+// ---------- Phiên bản & kiểm tra cập nhật ----------
+const UPDATE_REPO = 'sinhgiang/video-grabber';
+const UPDATE_DISMISS_KEY = 'vg_update_dismissed_version';
+let appVersion = '0.0.0';
+
+function parseVersion(v) {
+  return String(v || '0')
+    .trim()
+    .replace(/^v/i, '')
+    .split('.')
+    .map((n) => parseInt(n, 10) || 0);
+}
+
+function isNewerVersion(latest, current) {
+  const a = parseVersion(latest);
+  const b = parseVersion(current);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] || 0;
+    const y = b[i] || 0;
+    if (x > y) return true;
+    if (x < y) return false;
+  }
+  return false;
+}
+
+async function loadAppVersion() {
+  try {
+    const res = await fetch('/api/version');
+    const data = await res.json();
+    appVersion = data.version || appVersion;
+    appVersionEl.textContent = `v${appVersion}`;
+  } catch {
+    appVersionEl.textContent = 'v?';
+  }
+}
+
+async function checkForUpdate(isManual) {
+  if (isManual) {
+    checkUpdateBtn.disabled = true;
+    checkUpdateBtn.textContent = '⏳ Đang kiểm tra…';
+    checkUpdateStatus.textContent = '';
+    checkUpdateStatus.className = 'check-update-status';
+  }
+  try {
+    const res = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`);
+    if (!res.ok) throw new Error('request failed');
+    const data = await res.json();
+    const latest = (data.tag_name || '').replace(/^v/i, '');
+
+    if (latest && isNewerVersion(latest, appVersion)) {
+      updateBannerText.textContent = `🚀 Đã có phiên bản mới v${latest} — bạn đang dùng v${appVersion}`;
+      updateBannerBtn.href = data.html_url || `https://github.com/${UPDATE_REPO}/releases/latest`;
+      // Chỉ ẩn banner nếu người dùng đã bấm đóng đúng phiên bản này rồi
+      if (localStorage.getItem(UPDATE_DISMISS_KEY) !== latest) {
+        updateBanner.hidden = false;
+      }
+      if (isManual) {
+        checkUpdateStatus.textContent = '🎉 Có bản cập nhật mới!';
+        checkUpdateStatus.className = 'check-update-status is-ok';
+      }
+    } else if (isManual) {
+      checkUpdateStatus.textContent = '✅ Bạn đang dùng phiên bản mới nhất.';
+      checkUpdateStatus.className = 'check-update-status is-ok';
+    }
+  } catch {
+    if (isManual) {
+      checkUpdateStatus.textContent = '⚠️ Không kiểm tra được (kiểm tra kết nối mạng).';
+      checkUpdateStatus.className = 'check-update-status is-err';
+    }
+  } finally {
+    if (isManual) {
+      checkUpdateBtn.disabled = false;
+      checkUpdateBtn.textContent = '🔄 Kiểm tra cập nhật';
+      setTimeout(() => {
+        checkUpdateStatus.textContent = '';
+        checkUpdateStatus.className = 'check-update-status';
+      }, 5000);
+    }
+  }
+}
+
+updateBannerClose.addEventListener('click', () => {
+  updateBanner.hidden = true;
+  const latest = (updateBannerText.textContent.match(/v(\d[\d.]*)/) || [])[1];
+  if (latest) localStorage.setItem(UPDATE_DISMISS_KEY, latest);
+});
+
+checkUpdateBtn.addEventListener('click', () => checkForUpdate(true));
+
+(async () => {
+  await loadAppVersion();
+  checkForUpdate(false);
+})();
 
 batchStartBtn.addEventListener('click', async () => {
   batchErrorMsg.hidden = true;

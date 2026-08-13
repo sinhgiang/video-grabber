@@ -8,6 +8,12 @@
 <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
+  <div id="updateBanner" class="update-banner" hidden>
+    <span id="updateBannerText"></span>
+    <a id="updateBannerBtn" class="update-banner__btn" href="https://github.com/sinhgiang/video-grabber/releases/latest" target="_blank" rel="noopener">⬇ Tải bản mới</a>
+    <button type="button" id="updateBannerClose" class="update-banner__close" aria-label="Đóng thông báo">✕</button>
+  </div>
+
   <div class="bg-glow bg-glow--1"></div>
   <div class="bg-glow bg-glow--2"></div>
 
@@ -167,7 +173,14 @@
     </p>
   </main>
 
-  <footer class="footer">Made with ♥ · chạy 100% trên máy của bạn</footer>
+  <footer class="footer">
+    <span>Made with ♥ · chạy 100% trên máy của bạn</span>
+    <span class="footer__version">
+      <span id="appVersion" class="version-badge">v…</span>
+      <button type="button" id="checkUpdateBtn" class="link-btn">🔄 Kiểm tra cập nhật</button>
+      <span id="checkUpdateStatus" class="check-update-status"></span>
+    </span>
+  </footer>
 
   <script src="/js/app.js"></script>
 </body>

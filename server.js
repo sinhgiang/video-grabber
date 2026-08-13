@@ -15,6 +15,11 @@ app.get('/api/cookie-browsers', (req, res) => {
   res.json({ browsers: SUPPORTED_COOKIE_BROWSERS });
 });
 
+app.get('/api/version', (req, res) => {
+  const pkg = require('./package.json');
+  res.json({ version: pkg.version, repo: 'sinhgiang/video-grabber' });
+});
+
 app.post('/api/info', async (req, res) => {
   const { url, cookiesFromBrowser } = req.body || {};
   if (!url || typeof url !== 'string') {

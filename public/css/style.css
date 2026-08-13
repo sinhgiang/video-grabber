@@ -455,7 +455,86 @@ body {
   padding: 24px;
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
+
+.footer__version {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.version-badge {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-family: 'Consolas', monospace;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent-3);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.link-btn:hover:not(:disabled) { color: var(--text); text-decoration: underline; }
+.link-btn:disabled { opacity: 0.5; cursor: default; }
+
+.check-update-status {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.check-update-status.is-ok { color: var(--success); }
+.check-update-status.is-err { color: var(--danger); }
+
+/* ---------- Banner thông báo phiên bản mới ---------- */
+.update-banner {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 20px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 500;
+  text-align: center;
+}
+.update-banner[hidden] { display: none; }
+.update-banner__btn {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.update-banner__btn:hover { background: rgba(255, 255, 255, 0.36); }
+.update-banner__close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+}
+.update-banner__close:hover { color: #fff; }
 
 @media (max-width: 640px) {
   .features { grid-template-columns: 1fr; }
