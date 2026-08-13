@@ -25,7 +25,7 @@ Công cụ **tải video &amp; audio miễn phí** từ YouTube, Facebook, TikTo
 **Yêu cầu:** [Node.js](https://nodejs.org/) ≥ 18
 
 ```bash
-git clone https://github.com/<your-username>/video-grabber.git
+git clone https://github.com/sinhgiang/video-grabber.git
 cd video-grabber
 npm install
 npm start
