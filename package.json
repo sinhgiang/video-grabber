@@ -56,7 +56,11 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "VideoGrabberSetup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "VideoGrabberPortable-${version}.${ext}"
     },
     "publish": [
       {
