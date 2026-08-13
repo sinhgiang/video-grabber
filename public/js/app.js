@@ -97,15 +97,22 @@ function renderQualities(qualities) {
     btn.className = 'chip' + (idx === 0 ? ' is-active' : '');
     btn.textContent = q.label;
     btn.dataset.value = q.value;
-    btn.addEventListener('click', () => {
-      qualityChips.querySelectorAll('.chip').forEach((c) => c.classList.remove('is-active'));
-      btn.classList.add('is-active');
-      selectedQuality = q.value;
-    });
     qualityChips.appendChild(btn);
   });
   selectedQuality = qualities[0]?.value || 'best';
 }
+
+// Dùng ủy quyền sự kiện (event delegation) gắn MỘT LẦN trên container thay vì gắn listener
+// riêng cho từng nút bên trong renderQualities() — giống cách typeSegmented/batchQualityChips
+// đang làm. Nhờ vậy các chip mặc định có sẵn trong HTML (trước khi phân tích video lần đầu)
+// cũng bấm được ngay, và không phụ thuộc việc renderQualities có chạy đúng lúc hay không.
+qualityChips.addEventListener('click', (e) => {
+  const btn = e.target.closest('.chip');
+  if (!btn) return;
+  qualityChips.querySelectorAll('.chip').forEach((c) => c.classList.remove('is-active'));
+  btn.classList.add('is-active');
+  selectedQuality = btn.dataset.value;
+});
 
 infoForm.addEventListener('submit', async (e) => {
   e.preventDefault();
