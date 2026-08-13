@@ -303,6 +303,12 @@ body {
   margin: 16px 0 4px;
   animation: rise 0.3s ease;
 }
+/* Khi thẻ có thuộc tính "hidden" (đặt bằng JS), phải luôn ẩn — nếu không thì
+   "display: flex" ở trên sẽ đè mất display:none mặc định của [hidden] và
+   khối xem trước (thumbnail/tiêu đề rỗng) sẽ hiện ra dù chưa phân tích xong. */
+.preview-mini[hidden] {
+  display: none;
+}
 .preview-mini__thumb {
   width: 120px; height: 78px;
   object-fit: cover;
