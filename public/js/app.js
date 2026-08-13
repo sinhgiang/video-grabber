@@ -23,8 +23,8 @@ const progressStatus = $('#progressStatus');
 
 const updateBanner = $('#updateBanner');
 const updateBannerText = $('#updateBannerText');
-const updateBannerBtn = $('#updateBannerBtn');
-const updateBannerClose = $('#updateBannerClose');
+const updateBannerYesBtn = $('#updateBannerYesBtn');
+const updateBannerNoBtn = $('#updateBannerNoBtn');
 const appVersionEl = $('#appVersion');
 const checkUpdateBtn = $('#checkUpdateBtn');
 const checkUpdateStatus = $('#checkUpdateStatus');
@@ -362,6 +362,10 @@ async function processQueueItem(url) {
 const UPDATE_REPO = 'sinhgiang/video-grabber';
 const UPDATE_DISMISS_KEY = 'vg_update_dismissed_version';
 let appVersion = '0.0.0';
+let latestKnownVersion = '';
+// Có preload.js (chạy trong app Electron đã đóng gói) hay không —
+// quyết định dùng luồng tự tải & tự cài, hay chỉ mở trang tải về.
+const isElectronApp = typeof window.vgUpdater !== 'undefined' && window.vgUpdater.isElectron;
 
 function parseVersion(v) {
   return String(v || '0')
@@ -394,7 +398,104 @@ async function loadAppVersion() {
   }
 }
 
-async function checkForUpdate(isManual) {
+function showUpdateBanner(latest) {
+  latestKnownVersion = latest;
+  updateBannerText.textContent = `🚀 Đã có phiên bản mới v${latest} — bạn đang dùng v${appVersion}. Cập nhật ngay?`;
+  updateBannerYesBtn.hidden = false;
+  updateBannerYesBtn.disabled = false;
+  updateBannerYesBtn.textContent = '✅ Có, cập nhật ngay';
+  updateBannerYesBtn.onclick = null;
+  updateBannerNoBtn.hidden = false;
+  // Chỉ ẩn banner nếu người dùng đã bấm "Để sau" đúng phiên bản này rồi
+  if (localStorage.getItem(UPDATE_DISMISS_KEY) !== latest) {
+    updateBanner.hidden = false;
+  }
+}
+
+// ----- Luồng dùng trong app Electron đã đóng gói: tự tải & tự cài -----
+// bannerYesMode: 'download' (mặc định, gọi qua IPC) hoặc 'open-page' (khi tự cập nhật lỗi, mở trang tải thủ công)
+let bannerYesMode = 'download';
+
+function setupElectronUpdater() {
+  window.vgUpdater.onStatus((data) => {
+    switch (data.channel) {
+      case 'available':
+        bannerYesMode = 'download';
+        showUpdateBanner(data.version);
+        break;
+      case 'not-available':
+        if (checkUpdateBtn.dataset.checking) {
+          checkUpdateStatus.textContent = '✅ Bạn đang dùng phiên bản mới nhất.';
+          checkUpdateStatus.className = 'check-update-status is-ok';
+        }
+        resetManualCheckBtn();
+        break;
+      case 'progress':
+        updateBanner.hidden = false;
+        updateBannerYesBtn.textContent = `⏳ Đang tải… ${data.percent}%`;
+        break;
+      case 'downloaded':
+        updateBannerText.textContent = '✅ Đã tải xong bản cập nhật — đang khởi động lại để cài đặt…';
+        updateBannerYesBtn.hidden = true;
+        updateBannerNoBtn.hidden = true;
+        setTimeout(() => window.vgUpdater.quitAndInstall(), 1200);
+        break;
+      case 'error':
+        resetManualCheckBtn();
+        if (!updateBanner.hidden || latestKnownVersion) {
+          bannerYesMode = 'open-page';
+          updateBannerText.textContent = `⚠️ Không tự cập nhật được (${data.message || 'lỗi không rõ'}). Vui lòng tải thủ công.`;
+          updateBannerYesBtn.textContent = '⬇ Mở trang tải về';
+          updateBannerYesBtn.hidden = false;
+          updateBannerYesBtn.disabled = false;
+          updateBanner.hidden = false;
+        }
+        if (checkUpdateBtn.dataset.checking) {
+          checkUpdateStatus.textContent = '⚠️ Không kiểm tra được (kiểm tra kết nối mạng).';
+          checkUpdateStatus.className = 'check-update-status is-err';
+        }
+        break;
+    }
+  });
+
+  updateBannerYesBtn.addEventListener('click', () => {
+    if (bannerYesMode === 'open-page') {
+      window.open(`https://github.com/${UPDATE_REPO}/releases/latest`, '_blank');
+      return;
+    }
+    updateBannerYesBtn.disabled = true;
+    updateBannerYesBtn.textContent = '⏳ Đang tải…';
+    updateBannerNoBtn.hidden = true;
+    window.vgUpdater.downloadUpdate();
+  });
+
+  updateBannerNoBtn.addEventListener('click', () => {
+    updateBanner.hidden = true;
+    if (latestKnownVersion) localStorage.setItem(UPDATE_DISMISS_KEY, latestKnownVersion);
+  });
+
+  checkUpdateBtn.addEventListener('click', () => {
+    checkUpdateBtn.dataset.checking = '1';
+    checkUpdateBtn.disabled = true;
+    checkUpdateBtn.textContent = '⏳ Đang kiểm tra…';
+    checkUpdateStatus.textContent = '';
+    checkUpdateStatus.className = 'check-update-status';
+    window.vgUpdater.checkForUpdates();
+  });
+}
+
+function resetManualCheckBtn() {
+  delete checkUpdateBtn.dataset.checking;
+  checkUpdateBtn.disabled = false;
+  checkUpdateBtn.textContent = '🔄 Kiểm tra cập nhật';
+  setTimeout(() => {
+    checkUpdateStatus.textContent = '';
+    checkUpdateStatus.className = 'check-update-status';
+  }, 5000);
+}
+
+// ----- Luồng dùng khi chạy trên trình duyệt thường (npm start): chỉ báo & mở link -----
+async function checkForUpdateWeb(isManual) {
   if (isManual) {
     checkUpdateBtn.disabled = true;
     checkUpdateBtn.textContent = '⏳ Đang kiểm tra…';
@@ -408,12 +509,8 @@ async function checkForUpdate(isManual) {
     const latest = (data.tag_name || '').replace(/^v/i, '');
 
     if (latest && isNewerVersion(latest, appVersion)) {
-      updateBannerText.textContent = `🚀 Đã có phiên bản mới v${latest} — bạn đang dùng v${appVersion}`;
-      updateBannerBtn.href = data.html_url || `https://github.com/${UPDATE_REPO}/releases/latest`;
-      // Chỉ ẩn banner nếu người dùng đã bấm đóng đúng phiên bản này rồi
-      if (localStorage.getItem(UPDATE_DISMISS_KEY) !== latest) {
-        updateBanner.hidden = false;
-      }
+      showUpdateBanner(latest);
+      updateBannerYesBtn.onclick = () => window.open(data.html_url || `https://github.com/${UPDATE_REPO}/releases/latest`, '_blank');
       if (isManual) {
         checkUpdateStatus.textContent = '🎉 Có bản cập nhật mới!';
         checkUpdateStatus.className = 'check-update-status is-ok';
@@ -428,28 +525,26 @@ async function checkForUpdate(isManual) {
       checkUpdateStatus.className = 'check-update-status is-err';
     }
   } finally {
-    if (isManual) {
-      checkUpdateBtn.disabled = false;
-      checkUpdateBtn.textContent = '🔄 Kiểm tra cập nhật';
-      setTimeout(() => {
-        checkUpdateStatus.textContent = '';
-        checkUpdateStatus.className = 'check-update-status';
-      }, 5000);
-    }
+    if (isManual) resetManualCheckBtn();
   }
 }
 
-updateBannerClose.addEventListener('click', () => {
-  updateBanner.hidden = true;
-  const latest = (updateBannerText.textContent.match(/v(\d[\d.]*)/) || [])[1];
-  if (latest) localStorage.setItem(UPDATE_DISMISS_KEY, latest);
-});
-
-checkUpdateBtn.addEventListener('click', () => checkForUpdate(true));
+function setupWebUpdater() {
+  updateBannerNoBtn.addEventListener('click', () => {
+    updateBanner.hidden = true;
+    if (latestKnownVersion) localStorage.setItem(UPDATE_DISMISS_KEY, latestKnownVersion);
+  });
+  checkUpdateBtn.addEventListener('click', () => checkForUpdateWeb(true));
+}
 
 (async () => {
   await loadAppVersion();
-  checkForUpdate(false);
+  if (isElectronApp) {
+    setupElectronUpdater();
+  } else {
+    setupWebUpdater();
+    checkForUpdateWeb(false);
+  }
 })();
 
 batchStartBtn.addEventListener('click', async () => {

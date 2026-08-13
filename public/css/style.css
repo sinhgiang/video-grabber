@@ -519,12 +519,22 @@ body {
   background: rgba(255, 255, 255, 0.22);
   color: #fff;
   text-decoration: none;
+  font: inherit;
   font-weight: 700;
+  border: none;
   padding: 5px 14px;
   border-radius: 999px;
   white-space: nowrap;
+  cursor: pointer;
 }
 .update-banner__btn:hover { background: rgba(255, 255, 255, 0.36); }
+.update-banner__btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.update-banner__btn--ghost {
+  background: transparent;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+}
+.update-banner__btn--ghost:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
 .update-banner__close {
   background: none;
   border: none;
