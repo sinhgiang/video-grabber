@@ -19,9 +19,24 @@ const progressFill = $('#progressFill');
 const progressText = $('#progressText');
 const progressStatus = $('#progressStatus');
 
+const modeTabs = $('#modeTabs');
+const singleMode = $('#singleMode');
+const batchMode = $('#batchMode');
+const cookieBrowserSelect = $('#cookieBrowserSelect');
+const batchUrls = $('#batchUrls');
+const batchTypeSegmented = $('#batchTypeSegmented');
+const batchQualityChips = $('#batchQualityChips');
+const batchStartBtn = $('#batchStartBtn');
+const batchErrorMsg = $('#batchErrorMsg');
+const batchQueue = $('#batchQueue');
+
 let currentInfo = null;
 let selectedType = 'mp4';
 let selectedQuality = null;
+
+function cookiesFromBrowser() {
+  return cookieBrowserSelect.value || undefined;
+}
 
 function fmtDuration(sec) {
   if (!sec) return '';
@@ -75,7 +90,7 @@ infoForm.addEventListener('submit', async (e) => {
     const res = await fetch('/api/info', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, cookiesFromBrowser: cookiesFromBrowser() }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Có lỗi xảy ra.');
@@ -125,7 +140,12 @@ downloadBtn.addEventListener('click', async () => {
     const startRes = await fetch('/api/download/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: currentInfo.webpageUrl, type: selectedType, quality: selectedQuality }),
+      body: JSON.stringify({
+        url: currentInfo.webpageUrl,
+        type: selectedType,
+        quality: selectedQuality,
+        cookiesFromBrowser: cookiesFromBrowser(),
+      }),
     });
     const { jobId, error } = await startRes.json();
     if (!startRes.ok) throw new Error(error || 'Không thể bắt đầu tải.');
@@ -165,4 +185,147 @@ downloadBtn.addEventListener('click', async () => {
     progressStatus.className = 'is-error';
     downloadBtn.disabled = false;
   }
+});
+
+// ---------- Chuyển đổi chế độ Một video / Hàng loạt ----------
+modeTabs.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mode-tab');
+  if (!btn) return;
+  modeTabs.querySelectorAll('.mode-tab').forEach((b) => b.classList.remove('is-active'));
+  btn.classList.add('is-active');
+  const mode = btn.dataset.mode;
+  singleMode.hidden = mode !== 'single';
+  batchMode.hidden = mode !== 'batch';
+});
+
+// ---------- Chế độ tải hàng loạt ----------
+let batchType = 'mp4';
+let batchQuality = '2160';
+
+batchTypeSegmented.addEventListener('click', (e) => {
+  const btn = e.target.closest('.segmented__btn');
+  if (!btn) return;
+  batchType = btn.dataset.type;
+  batchTypeSegmented.querySelectorAll('.segmented__btn').forEach((b) => b.classList.remove('is-active'));
+  btn.classList.add('is-active');
+  batchQualityChips.parentElement.style.display = batchType === 'mp3' ? 'none' : '';
+});
+
+batchQualityChips.addEventListener('click', (e) => {
+  const btn = e.target.closest('.chip');
+  if (!btn) return;
+  batchQuality = btn.dataset.value;
+  batchQualityChips.querySelectorAll('.chip').forEach((c) => c.classList.remove('is-active'));
+  btn.classList.add('is-active');
+});
+
+function statusLabel(status) {
+  switch (status) {
+    case 'analyzing': return 'Đang phân tích…';
+    case 'queued': return 'Đang chờ trong hàng đợi…';
+    case 'downloading': return 'Đang tải…';
+    case 'ready': return '✅ Hoàn tất';
+    case 'error': return '❌ Lỗi';
+    default: return status;
+  }
+}
+
+function createQueueRow(url) {
+  const row = document.createElement('div');
+  row.className = 'queue-item';
+  row.innerHTML = `
+    <div class="queue-item__top">
+      <span class="queue-item__title" title="${url}">${url}</span>
+      <span class="queue-item__status">${statusLabel('analyzing')}</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+  `;
+  batchQueue.prepend(row);
+  return {
+    setTitle: (t) => { row.querySelector('.queue-item__title').textContent = t; row.querySelector('.queue-item__title').title = t; },
+    setStatus: (status, extra) => {
+      const el = row.querySelector('.queue-item__status');
+      el.textContent = extra || statusLabel(status);
+      el.className = 'queue-item__status ' + (status === 'downloading' ? 'st-downloading' : status === 'ready' ? 'st-ready' : status === 'error' ? 'st-error' : '');
+    },
+    setProgress: (pct) => { row.querySelector('.progress-fill').style.width = `${pct}%`; },
+  };
+}
+
+async function processQueueItem(url) {
+  const rowCtl = createQueueRow(url);
+  try {
+    const infoRes = await fetch('/api/info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, cookiesFromBrowser: cookiesFromBrowser() }),
+    });
+    const info = await infoRes.json();
+    if (!infoRes.ok) throw new Error(info.error || 'Không phân tích được video.');
+    rowCtl.setTitle(`${info.platform.label} · ${info.title}`);
+    rowCtl.setStatus('queued');
+
+    const quality = batchType === 'mp3' ? undefined
+      : (info.qualities.find((q) => Number(q.value) <= Number(batchQuality))?.value || info.qualities.at(-1)?.value);
+
+    const startRes = await fetch('/api/download/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: info.webpageUrl, type: batchType, quality, cookiesFromBrowser: cookiesFromBrowser() }),
+    });
+    const { jobId, error } = await startRes.json();
+    if (!startRes.ok) throw new Error(error || 'Không thể bắt đầu tải.');
+
+    await new Promise((resolve, reject) => {
+      const evtSource = new EventSource(`/api/download/progress/${jobId}`);
+      evtSource.onmessage = (evt) => {
+        const data = JSON.parse(evt.data);
+        rowCtl.setProgress(data.progress);
+        if (data.status === 'ready') {
+          rowCtl.setStatus('ready');
+          evtSource.close();
+          const a = document.createElement('a');
+          a.href = `/api/download/file/${jobId}`;
+          a.download = '';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          resolve();
+        } else if (data.status === 'error') {
+          rowCtl.setStatus('error', '❌ ' + (data.error || 'Lỗi tải'));
+          evtSource.close();
+          reject(new Error(data.error));
+        } else {
+          rowCtl.setStatus(data.status);
+        }
+      };
+      evtSource.onerror = () => { evtSource.close(); reject(new Error('Mất kết nối tới server.')); };
+    });
+  } catch (err) {
+    rowCtl.setStatus('error', '❌ ' + err.message);
+  }
+}
+
+batchStartBtn.addEventListener('click', async () => {
+  batchErrorMsg.hidden = true;
+  const urls = batchUrls.value
+    .split('\n')
+    .map((u) => u.trim())
+    .filter(Boolean);
+
+  if (!urls.length) {
+    batchErrorMsg.textContent = 'Hãy dán ít nhất một liên kết video.';
+    batchErrorMsg.hidden = false;
+    return;
+  }
+
+  batchStartBtn.disabled = true;
+  batchStartBtn.textContent = `⏳ Đang xử lý ${urls.length} video…`;
+
+  // Chạy song song, server tự giới hạn số lượt tải thực sự đồng thời.
+  await Promise.allSettled(urls.map((u) => processQueueItem(u)));
+
+  batchStartBtn.disabled = false;
+  batchStartBtn.textContent = '📦 Thêm vào hàng đợi & tải tất cả';
+  batchUrls.value = '';
 });

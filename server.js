@@ -1,8 +1,9 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { getInfo, startDownload, cleanupTmp, sanitizeFilename } = require('./lib/ytdlp');
+const { getInfo, startDownload, cleanupTmp, sanitizeFilename, SUPPORTED_COOKIE_BROWSERS } = require('./lib/ytdlp');
 const { createJob, getJob, updateJob, removeJob } = require('./lib/jobs');
+const { schedule } = require('./lib/queue');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,13 +11,17 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/api/cookie-browsers', (req, res) => {
+  res.json({ browsers: SUPPORTED_COOKIE_BROWSERS });
+});
+
 app.post('/api/info', async (req, res) => {
-  const { url } = req.body || {};
+  const { url, cookiesFromBrowser } = req.body || {};
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'Thiếu URL video.' });
   }
   try {
-    const info = await getInfo(url.trim());
+    const info = await getInfo(url.trim(), { cookiesFromBrowser });
     res.json(info);
   } catch (err) {
     console.error(err);
@@ -25,17 +30,22 @@ app.post('/api/info', async (req, res) => {
 });
 
 app.post('/api/download/start', (req, res) => {
-  const { url, type, quality } = req.body || {};
+  const { url, type, quality, cookiesFromBrowser } = req.body || {};
   if (!url || !['mp4', 'mp3'].includes(type)) {
     return res.status(400).json({ error: 'Thiếu tham số url/type hợp lệ.' });
   }
 
   const jobId = createJob();
   res.json({ jobId });
+  updateJob(jobId, { status: 'queued' });
 
-  startDownload({ url, type, quality }, (percent, eta) => {
-    updateJob(jobId, { status: 'downloading', progress: percent, eta });
-  })
+  schedule(
+    () =>
+      startDownload({ url, type, quality, cookiesFromBrowser }, (percent, eta) => {
+        updateJob(jobId, { status: 'downloading', progress: percent, eta });
+      }),
+    () => updateJob(jobId, { status: 'downloading' }) // báo khi job rời hàng đợi và bắt đầu chạy thật
+  )
     .then(({ filePath, tmpDir }) => {
       updateJob(jobId, {
         status: 'ready',

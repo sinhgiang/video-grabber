@@ -25,7 +25,28 @@
       <p class="hero__sub">YouTube · TikTok · Facebook · Instagram · X/Twitter và hơn 1000 trang khác. Chất lượng tới 4K, xuất MP4 hoặc MP3, không quảng cáo, không giới hạn.</p>
     </section>
 
-    <section class="card input-card">
+    <div class="mode-tabs" id="modeTabs">
+      <button type="button" class="mode-tab is-active" data-mode="single">🎯 Một video</button>
+      <button type="button" class="mode-tab" data-mode="batch">📦 Hàng loạt</button>
+    </div>
+
+    <details class="card advanced-card" id="advancedCard">
+      <summary>⚙️ Tuỳ chọn nâng cao — tải video/nhóm riêng tư cần đăng nhập</summary>
+      <div class="advanced-body">
+        <label class="option-label" for="cookieBrowserSelect">Lấy cookie đăng nhập từ trình duyệt</label>
+        <select id="cookieBrowserSelect">
+          <option value="">Không dùng (chỉ video công khai)</option>
+          <option value="chrome">Chrome</option>
+          <option value="edge">Edge</option>
+          <option value="firefox">Firefox</option>
+          <option value="brave">Brave</option>
+          <option value="opera">Opera</option>
+        </select>
+        <p class="hint">Dùng khi tải video riêng tư/giới hạn tuổi trên Facebook, Instagram, YouTube… mà bạn đã đăng nhập sẵn trên trình duyệt đó. Đóng trình duyệt trước khi tải nếu bị lỗi khoá file cookie.</p>
+      </div>
+    </details>
+
+    <section class="card input-card" id="singleMode">
       <form id="infoForm" class="input-row">
         <input
           id="urlInput"
@@ -41,6 +62,36 @@
         </button>
       </form>
       <p id="errorMsg" class="error-msg" hidden></p>
+    </section>
+
+    <section class="card input-card" id="batchMode" hidden>
+      <label class="option-label" for="batchUrls">Dán nhiều liên kết, mỗi dòng một link</label>
+      <textarea id="batchUrls" rows="5" placeholder="https://youtube.com/...&#10;https://tiktok.com/...&#10;https://facebook.com/..."></textarea>
+
+      <div class="options">
+        <div class="option-group">
+          <span class="option-label">Định dạng (áp dụng cho tất cả)</span>
+          <div class="segmented" id="batchTypeSegmented">
+            <button type="button" class="segmented__btn is-active" data-type="mp4">🎞️ MP4 (Video)</button>
+            <button type="button" class="segmented__btn" data-type="mp3">🎵 MP3 (Audio)</button>
+          </div>
+        </div>
+        <div class="option-group">
+          <span class="option-label">Chất lượng tối đa mong muốn</span>
+          <div class="chips" id="batchQualityChips">
+            <button type="button" class="chip is-active" data-value="2160">4K</button>
+            <button type="button" class="chip" data-value="1440">2K</button>
+            <button type="button" class="chip" data-value="1080">1080p</button>
+            <button type="button" class="chip" data-value="720">720p</button>
+            <button type="button" class="chip" data-value="480">480p</button>
+          </div>
+        </div>
+      </div>
+
+      <button id="batchStartBtn" class="btn btn--primary btn--full">📦 Thêm vào hàng đợi &amp; tải tất cả</button>
+      <p id="batchErrorMsg" class="error-msg" hidden></p>
+
+      <div id="batchQueue" class="batch-queue"></div>
     </section>
 
     <section id="resultCard" class="card result-card" hidden>

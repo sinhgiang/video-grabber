@@ -2,11 +2,13 @@
   "name": "video-grabber",
   "version": "1.0.0",
   "description": "Công cụ tải video/audio miễn phí từ YouTube, Facebook, TikTok và 1000+ nền tảng khác. Hỗ trợ chất lượng 720p/1080p/2K/4K, xuất MP4/MP3.",
-  "main": "server.js",
+  "main": "electron/main.js",
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "electron": "electron .",
+    "dist": "electron-builder",
     "postinstall": "node scripts/setup-ytdlp.js"
   },
   "keywords": [
@@ -26,5 +28,33 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.videograbber.app",
+    "productName": "Video Grabber",
+    "asar": false,
+    "files": [
+      "electron/**/*",
+      "server.js",
+      "lib/**/*",
+      "public/**/*",
+      "bin/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "directories": {
+      "output": "dist"
+    }
   }
 }
