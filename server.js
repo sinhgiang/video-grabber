@@ -25,10 +25,7 @@ app.post('/api/info', async (req, res) => {
     res.json(info);
   } catch (err) {
     console.error(err);
-    const msg = err && err.message && err.message.includes('quá lâu')
-      ? err.message
-      : 'Không lấy được thông tin video. Kiểm tra lại đường dẫn hoặc thử lại sau.';
-    res.status(422).json({ error: msg });
+    res.status(422).json({ error: (err && err.message) || 'Không lấy được thông tin video. Kiểm tra lại đường dẫn hoặc thử lại sau.' });
   }
 });
 
@@ -60,7 +57,8 @@ app.post('/api/download/start', (req, res) => {
     })
     .catch((err) => {
       console.error('[download]', err);
-      updateJob(jobId, { status: 'error', error: 'Tải thất bại. Video có thể bị giới hạn hoặc đường dẫn không hợp lệ.' });
+      const msg = (err && err.message) || 'Tải thất bại. Video có thể bị giới hạn hoặc đường dẫn không hợp lệ.';
+      updateJob(jobId, { status: 'error', error: msg });
     });
 });
 
