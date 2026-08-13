@@ -4,7 +4,9 @@ const infoForm = $('#infoForm');
 const urlInput = $('#urlInput');
 const analyzeBtn = $('#analyzeBtn');
 const errorMsg = $('#errorMsg');
-const resultCard = $('#resultCard');
+const analyzeProgress = $('#analyzeProgress');
+const analyzeElapsed = $('#analyzeElapsed');
+const previewMini = $('#previewMini');
 const thumb = $('#thumb');
 const platformBadge = $('#platformBadge');
 const videoTitle = $('#videoTitle');
@@ -32,7 +34,26 @@ const batchQueue = $('#batchQueue');
 
 let currentInfo = null;
 let selectedType = 'mp4';
-let selectedQuality = null;
+let selectedQuality = '1080'; // khớp với chip mặc định đang is-active trong HTML
+
+let analyzeTimer = null;
+let analyzeStartedAt = 0;
+
+function startAnalyzeProgress() {
+  analyzeProgress.hidden = false;
+  analyzeStartedAt = Date.now();
+  analyzeElapsed.textContent = 'Đang phân tích… 0s';
+  clearInterval(analyzeTimer);
+  analyzeTimer = setInterval(() => {
+    const s = Math.floor((Date.now() - analyzeStartedAt) / 1000);
+    analyzeElapsed.textContent = `Đang phân tích… ${s}s (thường mất 5–20s, tối đa ~45s)`;
+  }, 500);
+}
+
+function stopAnalyzeProgress() {
+  clearInterval(analyzeTimer);
+  analyzeProgress.hidden = true;
+}
 
 function cookiesFromBrowser() {
   return cookieBrowserSelect.value || undefined;
@@ -50,7 +71,9 @@ function fmtDuration(sec) {
 function setLoading(isLoading) {
   analyzeBtn.disabled = isLoading;
   analyzeBtn.querySelector('.spinner').hidden = !isLoading;
-  analyzeBtn.querySelector('.btn__label').textContent = isLoading ? 'Đang phân tích…' : 'Phân tích';
+  analyzeBtn.querySelector('.btn__label').textContent = isLoading ? 'Đang phân tích…' : '🔍 Xem trước';
+  if (isLoading) startAnalyzeProgress();
+  else stopAnalyzeProgress();
 }
 
 function showError(msg) {
@@ -79,7 +102,7 @@ function renderQualities(qualities) {
 infoForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   errorMsg.hidden = true;
-  resultCard.hidden = true;
+  previewMini.hidden = true;
   progressWrap.hidden = true;
 
   const url = urlInput.value.trim();
@@ -104,13 +127,10 @@ infoForm.addEventListener('submit', async (e) => {
     uploaderEl.textContent = data.uploader ? `👤 ${data.uploader}` : '';
     durationEl.textContent = data.duration ? `⏱ ${fmtDuration(data.duration)}` : '';
 
-    renderQualities(data.qualities);
-    selectedType = 'mp4';
-    typeSegmented.querySelectorAll('.segmented__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.type === 'mp4'));
-    qualityGroup.style.display = '';
+    if (selectedType !== 'mp3') renderQualities(data.qualities);
 
-    resultCard.hidden = false;
-    resultCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    previewMini.hidden = false;
+    previewMini.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (err) {
     showError(err.message);
   } finally {
@@ -128,7 +148,12 @@ typeSegmented.addEventListener('click', (e) => {
 });
 
 downloadBtn.addEventListener('click', async () => {
-  if (!currentInfo) return;
+  const url = (currentInfo && currentInfo.webpageUrl) || urlInput.value.trim();
+  if (!url) {
+    showError('Hãy dán liên kết video vào ô ở trên trước.');
+    return;
+  }
+  errorMsg.hidden = true;
   downloadBtn.disabled = true;
   progressWrap.hidden = false;
   progressFill.style.width = '0%';
@@ -141,7 +166,7 @@ downloadBtn.addEventListener('click', async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        url: currentInfo.webpageUrl,
+        url,
         type: selectedType,
         quality: selectedQuality,
         cookiesFromBrowser: cookiesFromBrowser(),
@@ -236,17 +261,36 @@ function createQueueRow(url) {
   row.innerHTML = `
     <div class="queue-item__top">
       <span class="queue-item__title" title="${url}">${url}</span>
-      <span class="queue-item__status">${statusLabel('analyzing')}</span>
+      <span class="queue-item__status">${statusLabel('analyzing')} · 0s</span>
     </div>
-    <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+    <div class="progress-bar is-indeterminate"><div class="progress-fill" style="width:0%"></div></div>
   `;
   batchQueue.prepend(row);
+
+  const startedAt = Date.now();
+  let curStatus = 'analyzing';
+  let curExtra = null;
+  const bar = row.querySelector('.progress-bar');
+  const statusEl = row.querySelector('.queue-item__status');
+
+  function render() {
+    const s = Math.floor((Date.now() - startedAt) / 1000);
+    const inFlight = curStatus === 'analyzing' || curStatus === 'queued' || curStatus === 'downloading';
+    statusEl.textContent = (curExtra || statusLabel(curStatus)) + (inFlight ? ` · ${s}s` : '');
+  }
+
+  const ticker = setInterval(render, 1000);
+  render();
+
   return {
     setTitle: (t) => { row.querySelector('.queue-item__title').textContent = t; row.querySelector('.queue-item__title').title = t; },
     setStatus: (status, extra) => {
-      const el = row.querySelector('.queue-item__status');
-      el.textContent = extra || statusLabel(status);
-      el.className = 'queue-item__status ' + (status === 'downloading' ? 'st-downloading' : status === 'ready' ? 'st-ready' : status === 'error' ? 'st-error' : '');
+      curStatus = status;
+      curExtra = extra || null;
+      statusEl.className = 'queue-item__status ' + (status === 'downloading' ? 'st-downloading' : status === 'ready' ? 'st-ready' : status === 'error' ? 'st-error' : '');
+      bar.classList.toggle('is-indeterminate', status === 'analyzing' || status === 'queued');
+      render();
+      if (status === 'ready' || status === 'error') clearInterval(ticker);
     },
     setProgress: (pct) => { row.querySelector('.progress-fill').style.width = `${pct}%`; },
   };

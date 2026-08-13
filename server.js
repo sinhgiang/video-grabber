@@ -25,7 +25,10 @@ app.post('/api/info', async (req, res) => {
     res.json(info);
   } catch (err) {
     console.error(err);
-    res.status(422).json({ error: 'Không lấy được thông tin video. Kiểm tra lại đường dẫn hoặc thử lại sau.' });
+    const msg = err && err.message && err.message.includes('quá lâu')
+      ? err.message
+      : 'Không lấy được thông tin video. Kiểm tra lại đường dẫn hoặc thử lại sau.';
+    res.status(422).json({ error: msg });
   }
 });
 

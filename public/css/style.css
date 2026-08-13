@@ -252,6 +252,12 @@ body {
 }
 .btn--primary:hover:not(:disabled) { filter: brightness(1.1); }
 .btn--full { width: 100%; margin-top: 18px; padding: 16px; font-size: 1.02rem; }
+.btn--ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.btn--ghost:hover:not(:disabled) { color: var(--text); border-color: var(--accent-3); }
 
 .spinner {
   width: 16px; height: 16px;
@@ -270,6 +276,50 @@ body {
 
 .result-card { animation: rise 0.35s ease; }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.analyze-progress {
+  margin: 14px 4px 4px;
+  animation: rise 0.25s ease;
+}
+.analyze-progress .progress-bar { height: 6px; margin-bottom: 8px; }
+.analyze-progress span {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* Thanh tiến trình dạng "không xác định %" — dải sáng trượt qua lại để biết là đang chạy, không bị treo */
+.progress-bar.is-indeterminate .progress-fill {
+  width: 40% !important;
+  animation: indeterminate 1.1s ease-in-out infinite;
+}
+@keyframes indeterminate {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+
+.preview-mini {
+  display: flex;
+  gap: 14px;
+  margin: 16px 0 4px;
+  animation: rise 0.3s ease;
+}
+.preview-mini__thumb {
+  width: 120px; height: 78px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #000;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+.preview-mini__title {
+  font-size: 0.98rem;
+  margin: 0 0 6px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
 .result-top { display: flex; gap: 16px; margin-bottom: 22px; }
 .result-thumb {

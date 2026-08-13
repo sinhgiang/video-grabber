@@ -56,12 +56,62 @@
           autocomplete="off"
           required
         />
-        <button type="submit" id="analyzeBtn" class="btn btn--primary">
-          <span class="btn__label">Phân tích</span>
+        <button type="submit" id="analyzeBtn" class="btn btn--ghost">
+          <span class="btn__label">🔍 Xem trước</span>
           <span class="spinner" hidden></span>
         </button>
       </form>
       <p id="errorMsg" class="error-msg" hidden></p>
+
+      <div id="analyzeProgress" class="analyze-progress" hidden>
+        <div class="progress-bar is-indeterminate"><div class="progress-fill"></div></div>
+        <span id="analyzeElapsed">Đang phân tích…</span>
+      </div>
+
+      <div id="previewMini" class="preview-mini" hidden>
+        <img id="thumb" class="preview-mini__thumb" alt="thumbnail" />
+        <div class="result-meta">
+          <span id="platformBadge" class="badge">—</span>
+          <h3 id="videoTitle" class="preview-mini__title">—</h3>
+          <div class="result-sub">
+            <span id="uploader"></span>
+            <span id="duration"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="options">
+        <div class="option-group">
+          <span class="option-label">Định dạng</span>
+          <div class="segmented" id="typeSegmented">
+            <button type="button" class="segmented__btn is-active" data-type="mp4">🎞️ MP4 (Video)</button>
+            <button type="button" class="segmented__btn" data-type="mp3">🎵 MP3 (Audio)</button>
+          </div>
+        </div>
+
+        <div class="option-group" id="qualityGroup">
+          <span class="option-label">Chất lượng</span>
+          <div class="chips" id="qualityChips">
+            <button type="button" class="chip" data-value="2160">4K</button>
+            <button type="button" class="chip" data-value="1440">2K</button>
+            <button type="button" class="chip is-active" data-value="1080">1080p</button>
+            <button type="button" class="chip" data-value="720">720p</button>
+            <button type="button" class="chip" data-value="480">480p</button>
+          </div>
+        </div>
+      </div>
+
+      <button id="downloadBtn" class="btn btn--primary btn--full">
+        <span class="btn__label">⬇ Tải xuống</span>
+      </button>
+
+      <div id="progressWrap" class="progress-wrap" hidden>
+        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+        <div class="progress-info">
+          <span id="progressText">0%</span>
+          <span id="progressStatus">Đang chuẩn bị…</span>
+        </div>
+      </div>
     </section>
 
     <section class="card input-card" id="batchMode" hidden>
@@ -92,47 +142,6 @@
       <p id="batchErrorMsg" class="error-msg" hidden></p>
 
       <div id="batchQueue" class="batch-queue"></div>
-    </section>
-
-    <section id="resultCard" class="card result-card" hidden>
-      <div class="result-top">
-        <img id="thumb" class="result-thumb" alt="thumbnail" />
-        <div class="result-meta">
-          <span id="platformBadge" class="badge">—</span>
-          <h2 id="videoTitle" class="result-title">—</h2>
-          <div class="result-sub">
-            <span id="uploader"></span>
-            <span id="duration"></span>
-          </div>
-        </div>
-      </div>
-
-      <div class="options">
-        <div class="option-group">
-          <span class="option-label">Định dạng</span>
-          <div class="segmented" id="typeSegmented">
-            <button type="button" class="segmented__btn is-active" data-type="mp4">🎞️ MP4 (Video)</button>
-            <button type="button" class="segmented__btn" data-type="mp3">🎵 MP3 (Audio)</button>
-          </div>
-        </div>
-
-        <div class="option-group" id="qualityGroup">
-          <span class="option-label">Chất lượng</span>
-          <div class="chips" id="qualityChips"></div>
-        </div>
-      </div>
-
-      <button id="downloadBtn" class="btn btn--primary btn--full">
-        <span class="btn__label">⬇ Tải xuống</span>
-      </button>
-
-      <div id="progressWrap" class="progress-wrap" hidden>
-        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
-        <div class="progress-info">
-          <span id="progressText">0%</span>
-          <span id="progressStatus">Đang chuẩn bị…</span>
-        </div>
-      </div>
     </section>
 
     <section class="features">
