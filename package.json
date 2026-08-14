@@ -1,6 +1,6 @@
 {
   "name": "video-grabber",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "Công cụ tải video/audio miễn phí từ YouTube, Facebook, TikTok và 1000+ nền tảng khác. Hỗ trợ chất lượng 720p/1080p/2K/4K, xuất MP4/MP3.",
   "main": "electron/main.js",
   "type": "commonjs",
