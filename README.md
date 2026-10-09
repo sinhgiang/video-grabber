@@ -51,7 +51,7 @@ Lệnh trên mở app trong một cửa sổ riêng (không phải trình duyệ
 npm run dist
 ```
 
-File cài đặt sẽ nằm trong thư mục `dist/` (bản NSIS installer và bản portable, chạy trên Windows). Lần chạy `npm run dist` đầu tiên có thể mất vài phút để tải công cụ đóng gói Electron.
+File cài đặt sẽ nằm trong thư mục `dist/` (bản NSIS installer và bản portable, chạy trên Windows). Trước khi đóng gói, `npm run dist` kiểm tra đã có `ffmpeg` và `yt-dlp`; thiếu thì dừng và chỉ lệnh tải lại. App desktop chỉ mở server trên `127.0.0.1` (máy khác trong mạng không gọi được) và tự chọn cổng khác nếu cổng 3000 đang bận. Lần chạy `npm run dist` đầu tiên có thể mất vài phút để tải công cụ đóng gói Electron.
 
 ## 🖱️ Cách dùng
 
@@ -78,13 +78,18 @@ File cài đặt sẽ nằm trong thư mục `dist/` (bản NSIS installer và b
 ```
 ├── server.js              # Express server + các API endpoint
 ├── electron/
-│   └── main.js              # Điểm khởi chạy ứng dụng desktop Electron
+│   ├── main.js              # Điểm khởi chạy ứng dụng desktop Electron
+│   ├── start-server.js      # Chạy server trên 127.0.0.1, tự đổi cổng nếu 3000 bận
+│   └── preload.js           # Cầu nối an toàn cho nút cập nhật
 ├── lib/
 │   ├── ytdlp.js            # Wrapper gọi yt-dlp, phân tích chất lượng, cookie
 │   ├── jobs.js             # Quản lý job tải (progress theo jobId)
 │   └── queue.js            # Hàng đợi giới hạn số lượt tải đồng thời (batch)
 ├── scripts/
-│   └── setup-ytdlp.js       # Tự tải binary yt-dlp khi npm install
+│   ├── setup-ytdlp.js       # Tự tải binary yt-dlp khi npm install
+│   └── check-bundle.js      # Chặn `npm run dist` khi thiếu ffmpeg hoặc yt-dlp
+├── test/                   # Test chạy bằng `npm test` (node --test)
+├── docs/feature-map.md     # Tính năng nằm ở đâu, cách chạy và kiểm tra
 ├── public/                 # Giao diện (HTML/CSS/JS thuần)
 │   ├── index.html
 │   ├── css/style.css

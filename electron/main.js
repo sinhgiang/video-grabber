@@ -2,15 +2,11 @@ const { app, BrowserWindow, shell, Menu, ipcMain } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
-const PORT = 3000;
-let mainWindow;
+const { startServer } = require('./start-server');
 
-// Chạy server Express ngay trong tiến trình chính của Electron —
-// người dùng không cần mở terminal, chỉ cần double-click app.
-function startServer() {
-  process.env.PORT = String(PORT);
-  require(path.join(__dirname, '..', 'server.js'));
-}
+const PREFERRED_PORT = 3000;
+let mainWindow;
+let serverPort;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -24,12 +20,13 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
 
   Menu.setApplicationMenu(null);
-  mainWindow.loadURL(`http://localhost:${PORT}`);
+  mainWindow.loadURL(`http://127.0.0.1:${serverPort}`);
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
 
@@ -85,8 +82,10 @@ function setupAutoUpdater() {
   setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 2 * 60 * 60 * 1000);
 }
 
-app.whenReady().then(() => {
-  startServer();
+app.whenReady().then(async () => {
+  // Chạy server Express ngay trong tiến trình chính của Electron —
+  // người dùng không cần mở terminal, chỉ cần double-click app.
+  serverPort = await startServer(path.join(__dirname, '..', 'server.js'), PREFERRED_PORT);
   createWindow();
 
   // Cơ chế auto-update chỉ hoạt động với bản đã đóng gói/cài đặt (NSIS),
