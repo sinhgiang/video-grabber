@@ -105,6 +105,10 @@ app.get('/api/download/file/:jobId', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`\n  🎬 Video Grabber đang chạy tại http://localhost:${PORT}\n`);
+// HOST trống = nghe mọi địa chỉ (để mở từ điện thoại cùng mạng khi chạy `npm start`).
+// App Electron đặt HOST=127.0.0.1 để máy khác trong mạng không gọi được API tải.
+const server = app.listen(PORT, process.env.HOST || undefined, () => {
+  console.log(`\n  🎬 Video Grabber đang chạy tại http://localhost:${server.address().port}\n`);
 });
+
+module.exports = server;
