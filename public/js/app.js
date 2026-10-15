@@ -29,6 +29,12 @@ const appVersionEl = $('#appVersion');
 const checkUpdateBtn = $('#checkUpdateBtn');
 const checkUpdateStatus = $('#checkUpdateStatus');
 
+const loginPromptBtn = $('#loginPromptBtn');
+const loginList = $('#loginList');
+const loginHint = $('#loginHint');
+const autoUpdateYtdlpEl = $('#autoUpdateYtdlp');
+const ytdlpVersionEl = $('#ytdlpVersion');
+
 const modeTabs = $('#modeTabs');
 const singleMode = $('#singleMode');
 const batchMode = $('#batchMode');
@@ -54,7 +60,7 @@ function startAnalyzeProgress() {
   clearInterval(analyzeTimer);
   analyzeTimer = setInterval(() => {
     const s = Math.floor((Date.now() - analyzeStartedAt) / 1000);
-    analyzeElapsed.textContent = `Đang phân tích… ${s}s (thường mất 5–20s, tối đa ~45s)`;
+    analyzeElapsed.textContent = `Đang phân tích… ${s}s (thường 5–20s; nếu nền tảng chặn, ứng dụng tự thử thêm vài cách nên có thể lâu hơn)`;
   }, 500);
 }
 
@@ -84,10 +90,142 @@ function setLoading(isLoading) {
   else stopAnalyzeProgress();
 }
 
-function showError(msg) {
-  errorMsg.textContent = msg;
+function showError(msg, extra) {
+  // Phần "(Đã thử: …)" cuối thông báo là chi tiết kỹ thuật — hiện nhỏ hơn dưới câu chính.
+  const i = msg.indexOf(' (Đã thử:');
+  errorMsg.textContent = i > 0 ? msg.slice(0, i) : msg;
+  if (i > 0) {
+    const detail = document.createElement('small');
+    detail.className = 'error-detail';
+    detail.textContent = msg.slice(i + 1);
+    errorMsg.append(document.createElement('br'), detail);
+  }
   errorMsg.hidden = false;
+  showLoginPrompt(extra);
 }
+
+// ---------- Đăng nhập một lần trong ứng dụng (Facebook, Instagram) ----------
+let loginProviders = [];
+let loginRetry = null; // việc làm lại sau khi đăng nhập xong (Xem trước / Tải xuống)
+
+function showLoginPrompt(extra, retry) {
+  const p = extra && extra.code === 'LOGIN_REQUIRED' && loginProviders.find((x) => x.key === extra.provider && x.available);
+  if (!p) {
+    loginPromptBtn.hidden = true;
+    return;
+  }
+  loginRetry = retry || (() => infoForm.requestSubmit());
+  loginPromptBtn.textContent = `🔐 Đăng nhập ${p.label} một lần`;
+  loginPromptBtn.dataset.provider = p.key;
+  loginPromptBtn.disabled = false;
+  loginPromptBtn.hidden = false;
+}
+
+async function startLogin(key, button) {
+  button.disabled = true;
+  const original = button.textContent;
+  button.textContent = '⏳ Đang chờ bạn đăng nhập trong cửa sổ vừa mở…';
+  try {
+    const res = await fetch('/api/login/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: key }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Không mở được cửa sổ đăng nhập.');
+    await refreshLogins();
+    if (data.loggedIn) {
+      loginPromptBtn.hidden = true;
+      errorMsg.hidden = true;
+      const retry = loginRetry;
+      loginRetry = null;
+      if (retry) retry(); // tự làm lại việc đang dở
+    } else {
+      showError('Chưa đăng nhập xong — cửa sổ đã đóng. Bấm lại nút đăng nhập nếu muốn thử tiếp.');
+    }
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
+async function refreshLogins() {
+  try {
+    const res = await fetch('/api/login/providers');
+    loginProviders = (await res.json()).providers || [];
+  } catch {
+    loginProviders = [];
+  }
+  renderLogins();
+}
+
+function renderLogins() {
+  loginList.innerHTML = '';
+  const available = loginProviders.filter((p) => p.available);
+  if (!available.length) {
+    loginHint.textContent = 'Đăng nhập trong ứng dụng chỉ có ở bản ứng dụng desktop (Video Grabber Setup). Ở bản web, hãy dùng mục "Lấy cookie đăng nhập từ trình duyệt" ở trên (nên chọn Firefox).';
+    return;
+  }
+  available.forEach((p) => {
+    const row = document.createElement('div');
+    row.className = 'login-row';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'login-btn';
+    btn.textContent = p.loggedIn ? `🔐 Đăng nhập lại ${p.label}` : `🔐 Đăng nhập ${p.label} một lần`;
+    btn.addEventListener('click', () => startLogin(p.key, btn));
+    const state = document.createElement('span');
+    state.className = 'login-state' + (p.loggedIn ? ' is-ok' : '');
+    state.textContent = p.loggedIn ? '✅ Đã đăng nhập (lưu trên máy này)' : 'Chưa đăng nhập';
+    row.append(btn, state);
+    if (p.loggedIn) {
+      const out = document.createElement('button');
+      out.type = 'button';
+      out.className = 'login-btn login-btn--ghost';
+      out.textContent = 'Đăng xuất / xoá phiên';
+      out.addEventListener('click', async () => {
+        await fetch('/api/login/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: p.key }),
+        });
+        refreshLogins();
+      });
+      row.append(out);
+    }
+    loginList.append(row);
+  });
+}
+
+loginPromptBtn.addEventListener('click', () => startLogin(loginPromptBtn.dataset.provider, loginPromptBtn));
+
+// ---------- Cài đặt: tự cập nhật yt-dlp ----------
+async function loadSettings() {
+  try {
+    const s = await (await fetch('/api/settings')).json();
+    autoUpdateYtdlpEl.checked = s.autoUpdateYtdlp !== false;
+    ytdlpVersionEl.textContent = s.ytdlpVersion ? `Đang dùng yt-dlp ${s.ytdlpVersion}.` : '';
+  } catch {
+    // giữ giá trị mặc định
+  }
+}
+
+autoUpdateYtdlpEl.addEventListener('change', async () => {
+  try {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ autoUpdateYtdlp: autoUpdateYtdlpEl.checked }),
+    });
+  } catch {
+    // lần sau mở lại sẽ đọc lại giá trị thật
+  }
+});
+
+refreshLogins();
+loadSettings();
 
 function renderQualities(qualities) {
   qualityChips.innerHTML = '';
@@ -117,6 +255,7 @@ qualityChips.addEventListener('click', (e) => {
 infoForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   errorMsg.hidden = true;
+  loginPromptBtn.hidden = true;
   previewMini.hidden = true;
   progressWrap.hidden = true;
 
@@ -131,7 +270,11 @@ infoForm.addEventListener('submit', async (e) => {
       body: JSON.stringify({ url, cookiesFromBrowser: cookiesFromBrowser() }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Có lỗi xảy ra.');
+    if (!res.ok) {
+      const err = new Error(data.error || 'Có lỗi xảy ra.');
+      err.extra = data;
+      throw err;
+    }
 
     currentInfo = data;
     thumb.src = data.thumbnail || '';
@@ -147,7 +290,7 @@ infoForm.addEventListener('submit', async (e) => {
     previewMini.hidden = false;
     previewMini.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (err) {
-    showError(err.message);
+    showError(err.message, err.extra);
   } finally {
     setLoading(false);
   }
@@ -169,6 +312,7 @@ downloadBtn.addEventListener('click', async () => {
     return;
   }
   errorMsg.hidden = true;
+  loginPromptBtn.hidden = true;
   downloadBtn.disabled = true;
   progressWrap.hidden = false;
   progressFill.style.width = '0%';
@@ -197,7 +341,7 @@ downloadBtn.addEventListener('click', async () => {
       progressText.textContent = `${data.progress}%`;
 
       if (data.status === 'downloading') {
-        progressStatus.textContent = data.eta ? `Đang tải… còn khoảng ${data.eta}` : 'Đang tải…';
+        progressStatus.textContent = data.stage || (data.eta ? `Đang tải… còn khoảng ${data.eta}` : 'Đang tải…');
       } else if (data.status === 'ready') {
         progressStatus.textContent = '✅ Hoàn tất! Đang lưu file…';
         progressStatus.className = 'is-ready';
@@ -215,6 +359,7 @@ downloadBtn.addEventListener('click', async () => {
         progressStatus.className = 'is-error';
         evtSource.close();
         downloadBtn.disabled = false;
+        showLoginPrompt(data, () => downloadBtn.click());
       }
     };
     evtSource.onerror = () => {

@@ -73,6 +73,13 @@ File cài đặt sẽ nằm trong thư mục `dist/` (bản NSIS installer và b
 2. Chọn trình duyệt bạn đã đăng nhập tài khoản trên đó (Chrome/Edge/Firefox…)
 3. Dán link như bình thường — công cụ sẽ mượn cookie đăng nhập của trình duyệt đó để truy cập nội dung bạn có quyền xem
 
+**Facebook / Instagram (bản ứng dụng desktop):** Facebook không cho người chưa đăng nhập xem video, kể cả video công khai. Khi gặp link như vậy, ứng dụng tự thử lần lượt: (1) cách thường → (2) giả dạng trình duyệt Chrome / Safari / Chrome Android → (3) cookie của Firefox, Edge, Brave, Chrome, Opera có sẵn trên máy → (4) phiên đăng nhập đã lưu trong ứng dụng. Nếu hết cách, ứng dụng hiện nút **🔐 Đăng nhập Facebook một lần** (cũng có trong Tuỳ chọn nâng cao): đăng nhập trong cửa sổ của ứng dụng, sau đó Xem trước / Tải xuống tự chạy lại.
+
+- Phiên đăng nhập là dữ liệu riêng của bạn: chỉ lưu trên máy này (Chromium mã hoá khi lưu), không gửi đi đâu, không ghi vào nhật ký; cookie chỉ được xuất ra một tệp tạm trong lúc yt-dlp chạy rồi xoá ngay. Bấm **Đăng xuất / xoá phiên** để xoá.
+- Chrome/Edge bản mới mã hoá cookie nên thường không đọc được từ ngoài (hoặc bị khoá khi trình duyệt đang mở) — đó là lý do có bước đăng nhập trong ứng dụng.
+- **Giới hạn:** video đã bị gỡ, hoặc tài khoản bạn đăng nhập không có quyền xem (riêng tư/chỉ bạn bè của người khác), thì không tải được; ứng dụng báo đúng lý do thay vì "thử lại sau".
+- **Tự cập nhật yt-dlp:** khi mở ứng dụng, yt-dlp tự cập nhật bản mới nhất từ trang chính thức (kiểm tra mã SHA-256) để theo kịp thay đổi của Facebook/TikTok…; tắt được ở Tuỳ chọn nâng cao.
+
 ## 📁 Cấu trúc dự án
 
 ```
@@ -80,9 +87,14 @@ File cài đặt sẽ nằm trong thư mục `dist/` (bản NSIS installer và b
 ├── electron/
 │   ├── main.js              # Điểm khởi chạy ứng dụng desktop Electron
 │   ├── start-server.js      # Chạy server trên 127.0.0.1, tự đổi cổng nếu 3000 bận
+│   ├── login.js             # Cửa sổ đăng nhập Facebook/Instagram trong ứng dụng (partition riêng, sandbox)
 │   └── preload.js           # Cầu nối an toàn cho nút cập nhật
 ├── lib/
 │   ├── ytdlp.js            # Wrapper gọi yt-dlp, phân tích chất lượng, cookie
+│   ├── escalation.js       # Chuỗi tự leo thang (thường → giả dạng → cookie trình duyệt → phiên app) + lỗi cuối đúng nguyên nhân
+│   ├── sessions.js         # Phiên đăng nhập Facebook/Instagram: tệp cookie tạm cho yt-dlp, kiểm tên miền
+│   ├── settings.js         # Cài đặt người dùng (tự cập nhật yt-dlp)
+│   ├── ytdlp-update.js     # Tự cập nhật yt-dlp khi mở app (kiểm SHA-256)
 │   ├── jobs.js             # Quản lý job tải (progress theo jobId)
 │   └── queue.js            # Hàng đợi giới hạn số lượt tải đồng thời (batch)
 ├── scripts/

@@ -47,7 +47,21 @@
           <option value="brave">Brave</option>
           <option value="opera">Opera</option>
         </select>
-        <p class="hint">Dùng khi tải video riêng tư/giới hạn tuổi trên Facebook, Instagram, YouTube… mà bạn đã đăng nhập sẵn trên trình duyệt đó. Đóng trình duyệt trước khi tải nếu bị lỗi khoá file cookie.</p>
+        <p class="hint">Dùng khi tải video riêng tư/giới hạn tuổi trên Facebook, Instagram, YouTube… mà bạn đã đăng nhập sẵn trên trình duyệt đó. Đóng trình duyệt trước khi tải nếu bị lỗi khoá file cookie. (Chrome/Edge bản mới mã hoá cookie nên thường không đọc được — hãy dùng Firefox hoặc đăng nhập ngay trong ứng dụng ở bên dưới.)</p>
+
+        <div class="login-box" id="loginBox">
+          <span class="option-label">Đăng nhập một lần ngay trong ứng dụng</span>
+          <div id="loginList" class="login-list"></div>
+          <p class="hint" id="loginHint">Facebook không cho người chưa đăng nhập xem video, kể cả video công khai. Bấm nút để mở cửa sổ đăng nhập của ứng dụng; phiên đăng nhập chỉ lưu trên máy bạn, không gửi đi đâu và không ghi vào nhật ký. Bấm "Đăng xuất" để xoá phiên.</p>
+        </div>
+
+        <div class="settings-box">
+          <label class="check-row" for="autoUpdateYtdlp">
+            <input type="checkbox" id="autoUpdateYtdlp" checked />
+            <span>Tự cập nhật yt-dlp khi mở ứng dụng</span>
+          </label>
+          <p class="hint">yt-dlp là bộ máy đọc video; bản mới thường sửa lỗi Facebook/TikTok… mà không cần cài lại ứng dụng. Chỉ tải từ trang chính thức của yt-dlp và kiểm tra mã SHA-256 trước khi dùng. <span id="ytdlpVersion"></span></p>
+        </div>
       </div>
     </details>
 
@@ -67,6 +81,7 @@
         </button>
       </form>
       <p id="errorMsg" class="error-msg" hidden></p>
+      <button type="button" id="loginPromptBtn" class="login-prompt-btn" hidden></button>
 
       <div id="analyzeProgress" class="analyze-progress" hidden>
         <div class="progress-bar is-indeterminate"><div class="progress-fill"></div></div>
