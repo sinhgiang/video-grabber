@@ -1,8 +1,10 @@
-const { app, BrowserWindow, shell, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, Menu, ipcMain, session } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
 const { startServer } = require('./start-server');
+const { createLoginManager } = require('./login');
+const sessions = require('../lib/sessions');
 
 const PREFERRED_PORT = 3000;
 let mainWindow;
@@ -83,6 +85,13 @@ function setupAutoUpdater() {
 }
 
 app.whenReady().then(async () => {
+  // Thư mục dữ liệu riêng của người dùng: cài đặt, bản yt-dlp tự cập nhật. Đặt TRƯỚC khi nạp server.
+  process.env.VG_DATA_DIR = app.getPath('userData');
+  // Tự cập nhật yt-dlp khi khởi động (tắt được ở "Tuỳ chọn nâng cao")
+  process.env.VG_STARTUP_UPDATE = '1';
+  // Cửa sổ đăng nhập trong ứng dụng (Facebook, Instagram) cho server dùng khi video cần đăng nhập
+  sessions.register(createLoginManager({ BrowserWindow, session, getParent: () => mainWindow }));
+
   // Chạy server Express ngay trong tiến trình chính của Electron —
   // người dùng không cần mở terminal, chỉ cần double-click app.
   serverPort = await startServer(path.join(__dirname, '..', 'server.js'), PREFERRED_PORT);
