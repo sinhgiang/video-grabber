@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+
+# Chỉ đọc nội dung repo; workflow không cần ghi gì và không dùng secrets.
+permissions:
+  contents: read
+
+# Đẩy commit mới lên cùng pull request thì huỷ lượt cũ để đỡ tốn phút.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Không tải file chạy Electron (~100 MB) và không đóng gói bản cài: CI chỉ chạy test.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
