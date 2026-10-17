@@ -34,6 +34,14 @@ function localOnly(req, res, next) {
   next();
 }
 
+// Các route xem trước/tải xuống tự dùng phiên đăng nhập trong ứng dụng nên cũng phải qua chốt đó:
+// trong app desktop (có cửa sổ đăng nhập) chỉ nhận yêu cầu từ chính trang của app; bản web chạy từ điện thoại
+// trong mạng LAN không có phiên trong app nên vẫn nhận yêu cầu như trước.
+function localOnlyWhenSessions(req, res, next) {
+  if (sessions.isAvailable()) return localOnly(req, res, next);
+  next();
+}
+
 // Danh sách nền tảng có đăng nhập trong ứng dụng + đã đăng nhập chưa (KHÔNG bao giờ trả cookie).
 app.get('/api/login/providers', localOnly, async (req, res) => {
   const out = [];
@@ -85,7 +93,7 @@ app.get('/api/version', (req, res) => {
   res.json({ version: pkg.version, repo: 'sinhgiang/video-grabber' });
 });
 
-app.post('/api/info', async (req, res) => {
+app.post('/api/info', localOnlyWhenSessions, async (req, res) => {
   const { url, cookiesFromBrowser } = req.body || {};
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'Thiếu URL video.' });
@@ -103,7 +111,7 @@ app.post('/api/info', async (req, res) => {
   }
 });
 
-app.post('/api/download/start', (req, res) => {
+app.post('/api/download/start', localOnlyWhenSessions, (req, res) => {
   const { url, type, quality, cookiesFromBrowser } = req.body || {};
   if (!url || !['mp4', 'mp3'].includes(type)) {
     return res.status(400).json({ error: 'Thiếu tham số url/type hợp lệ.' });
@@ -140,7 +148,7 @@ app.post('/api/download/start', (req, res) => {
     });
 });
 
-app.get('/api/download/progress/:jobId', (req, res) => {
+app.get('/api/download/progress/:jobId', localOnlyWhenSessions, (req, res) => {
   const job = getJob(req.params.jobId);
   if (!job) return res.status(404).end();
 
@@ -151,7 +159,9 @@ app.get('/api/download/progress/:jobId', (req, res) => {
   });
 
   const send = (j) => {
-    res.write(`data: ${JSON.stringify({ status: j.status, progress: j.progress, eta: j.eta, error: j.error })}\n\n`);
+    // stage/code/provider cho giao diện hiện "đang thử cách n/m" và nút đăng nhập khi lỗi LOGIN_REQUIRED
+    const { status, progress, eta, error, stage, code, provider } = j;
+    res.write(`data: ${JSON.stringify({ status, progress, eta, error, stage, code, provider })}\n\n`);
     if (j.status === 'ready' || j.status === 'error') {
       job.listeners.delete(send);
       res.end();
@@ -164,7 +174,7 @@ app.get('/api/download/progress/:jobId', (req, res) => {
   req.on('close', () => job.listeners.delete(send));
 });
 
-app.get('/api/download/file/:jobId', (req, res) => {
+app.get('/api/download/file/:jobId', localOnlyWhenSessions, (req, res) => {
   const job = getJob(req.params.jobId);
   if (!job || job.status !== 'ready' || !job.filePath) {
     return res.status(404).json({ error: 'File chưa sẵn sàng.' });

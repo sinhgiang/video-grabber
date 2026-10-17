@@ -123,3 +123,88 @@ test('lỗi Facebook từ /api/info trả kèm code và provider để giao di�
     ytdlp._wrap.execPromise = real;
   }
 });
+
+const fakeSessionImpl = () => ({ status: async () => false, login: async () => false, logout: async () => {}, exportCookies: async () => null });
+
+test('app desktop: /api/info và /api/download/* tự dùng phiên đăng nhập nên Origin lạ và Host lạ (DNS rebinding) đều bị 403', async () => {
+  sessions.register(fakeSessionImpl());
+  const body = { url: 'https://www.facebook.com/reel/1784783755975931', type: 'mp4' };
+  for (const [m, u, b] of [
+    ['POST', '/api/info', body],
+    ['POST', '/api/download/start', body],
+    ['GET', '/api/download/progress/abc'],
+    ['GET', '/api/download/file/abc'],
+  ]) {
+    assert.strictEqual((await call(m, u, { body: b, headers: { Origin: 'https://evil.example' } })).status, 403, `${m} ${u} với Origin lạ`);
+    assert.strictEqual((await call(m, u, { body: b, headers: { Host: 'evil.example:3000' } })).status, 403, `${m} ${u} với Host lạ`);
+  }
+  // cùng nguồn gốc vẫn vào được tới route (job không tồn tại → 404, không phải 403)
+  const ok = await call('GET', '/api/download/progress/abc', { headers: { Origin: `http://127.0.0.1:${port}` } });
+  assert.strictEqual(ok.status, 404);
+});
+
+test('bản web (không có phiên trong app): mở từ máy khác trong mạng LAN (Host khác) vẫn dùng được như trước', async () => {
+  sessions.register(null);
+  const r = await call('POST', '/api/info', { body: {}, headers: { Host: '192.168.1.20:3000' } });
+  assert.strictEqual(r.status, 400); // tới được route, bị từ chối vì thiếu URL, không phải 403
+  assert.strictEqual((await call('GET', '/api/download/progress/abc', { headers: { Host: '192.168.1.20:3000' } })).status, 404);
+});
+
+// Đọc SSE tiến trình của một job tới khi server đóng luồng; gọi onFirst sau sự kiện đầu tiên
+function readProgress(jobId, onFirst) {
+  return new Promise((resolve, reject) => {
+    const events = [];
+    const req = http.request({ host: '127.0.0.1', port, path: `/api/download/progress/${jobId}`, method: 'GET' }, (res) => {
+      let buf = '';
+      res.on('data', (c) => {
+        buf += c;
+        let i;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const line = buf.slice(0, i).replace(/^data: /, '');
+          buf = buf.slice(i + 2);
+          events.push(JSON.parse(line));
+          if (events.length === 1) onFirst();
+        }
+      });
+      res.on('end', () => resolve(events));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+test('SSE tiến trình tải mang stage, code và provider: giao diện hiện "đang thử cách n/m" và nút đăng nhập khi LOGIN_REQUIRED', async () => {
+  const { EventEmitter } = require('events');
+  const ytdlp = require('../lib/ytdlp');
+  const realExec = ytdlp._wrap.exec;
+  process.env.VG_RETRY_DELAY_MS = '0';
+  ytdlp._resetStepMemory();
+  sessions.register(fakeSessionImpl()); // app desktop, chưa đăng nhập
+  let release;
+  const gate = new Promise((r) => (release = r));
+  ytdlp._wrap.exec = () => {
+    const em = new EventEmitter();
+    em.ytDlpProcess = { stdout: new EventEmitter(), stderr: new EventEmitter() };
+    gate.then(() => {
+      em.ytDlpProcess.stderr.emit('data', Buffer.from('ERROR: [facebook] 1: Cannot parse data; please report this issue'));
+      em.emit('error', new Error('Error code: 1'));
+      em.emit('close');
+    });
+    return em;
+  };
+  try {
+    const start = await call('POST', '/api/download/start', { body: { url: 'https://www.facebook.com/reel/1784783755975931', type: 'mp4', quality: 'best' } });
+    assert.strictEqual(start.status, 200);
+    const events = await readProgress(start.json().jobId, release);
+    const last = events[events.length - 1];
+    assert.strictEqual(last.status, 'error');
+    assert.strictEqual(last.code, 'LOGIN_REQUIRED');
+    assert.strictEqual(last.provider, 'facebook');
+    assert.match(last.error, /Đăng nhập Facebook một lần/);
+    assert.ok(events.some((e) => /cách \d+\/\d+/.test(e.stage || '')), 'phải có sự kiện mang dòng "cách n/m"');
+  } finally {
+    ytdlp._wrap.exec = realExec;
+    ytdlp._resetStepMemory();
+    sessions.register(null);
+  }
+});
