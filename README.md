@@ -78,7 +78,7 @@ File cài đặt sẽ nằm trong thư mục `dist/` (bản NSIS installer và b
 - Phiên đăng nhập là dữ liệu riêng của bạn: chỉ lưu trên máy này (Chromium mã hoá khi lưu), không gửi đi đâu, không ghi vào nhật ký; cookie chỉ được xuất ra một tệp tạm trong lúc yt-dlp chạy rồi xoá ngay. Bấm **Đăng xuất / xoá phiên** để xoá.
 - Chrome/Edge bản mới mã hoá cookie nên thường không đọc được từ ngoài (hoặc bị khoá khi trình duyệt đang mở) — đó là lý do có bước đăng nhập trong ứng dụng.
 - **Giới hạn:** video đã bị gỡ, hoặc tài khoản bạn đăng nhập không có quyền xem (riêng tư/chỉ bạn bè của người khác), thì không tải được; ứng dụng báo đúng lý do thay vì "thử lại sau".
-- **Tự cập nhật yt-dlp:** khi mở ứng dụng, yt-dlp tự cập nhật bản mới nhất từ trang chính thức (kiểm tra mã SHA-256) để theo kịp thay đổi của Facebook/TikTok…; tắt được ở Tuỳ chọn nâng cao.
+- **Tự cập nhật yt-dlp:** khi mở ứng dụng, yt-dlp tự cập nhật bản mới nhất từ trang chính thức (kiểm tra mã SHA-256) để theo kịp thay đổi của Facebook/TikTok…; tắt được ở Tuỳ chọn nâng cao (tắt chỉ dừng các lần cập nhật sau; bản đã tải vẫn được dùng cho tới khi ứng dụng lên bản mới).
 
 ## 📁 Cấu trúc dự án
 
