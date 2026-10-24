@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      # Không tải file chạy Electron (~100 MB) và không đóng gói bản cài: CI chỉ chạy test.
+      # Không tải file chạy Electron (~100 MB) và không đóng gói bản cài: CI chỉ lint, kiểm build và chạy test.
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v4
@@ -32,4 +32,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # ESLint (bộ recommended): biến chưa khai báo, biến thừa, mã không chạy tới.
+      - run: npm run lint
+      # "Build" của dự án: `npm run dist` cần Windows, yt-dlp và ffmpeg nên CI không đóng gói thật.
+      # Bước này kiểm cú pháp mọi tệp JS, require trỏ tới tệp hoặc gói trong "dependencies", build.files
+      # và các tệp css/js mà trang chính gọi (scripts/check-build.js).
+      - run: npm run check:build
       - run: npm test

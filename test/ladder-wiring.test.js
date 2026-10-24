@@ -56,7 +56,7 @@ test.afterEach(() => {
   ytdlp._resetStepMemory();
 });
 
-function parseError(url = FB_URL) {
+function parseError() {
   return new Error(`Error code: 1\n\nStderr:\nERROR: [facebook] 1784783755975931: Cannot parse data; please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template.`);
 }
 

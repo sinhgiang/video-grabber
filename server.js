@@ -1,5 +1,4 @@
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
 const ytdlp = require('./lib/ytdlp');
 const { getInfo, startDownload, cleanupTmp, sanitizeFilename, SUPPORTED_COOKIE_BROWSERS } = ytdlp;
