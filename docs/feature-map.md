@@ -20,6 +20,6 @@
 - Test account: không cần tài khoản. Video thử công khai, ngắn: https://www.youtube.com/watch?v=jNQXAC9IVRw (19 giây).
 - Main flow to go through: dán link → "Xem trước" → chọn MP4 hoặc MP3 → "Tải xuống" → file về máy (MP3 bắt đầu bằng `ID3`, MP4 có hộp `ftyp`).
 - Tests: `npm test` (node --test, thư mục `test/`).
-- Lint: `npm run lint` (ESLint, cấu hình `eslint.config.js`). Kiểm build không cần đóng gói: `npm run check:build` (`scripts/check-build.js`). Pull request chạy cả hai rồi `npm test` (`.github/workflows/ci.yml`).
+- Lint: `npm run lint` (ESLint, cấu hình `eslint.config.js`). Kiểm build không cần đóng gói: `npm run build` (`scripts/check-build.js`; đóng gói thật vẫn là `npm run dist`). Pull request chạy cả hai rồi `npm test` (`.github/workflows/ci.yml`).
 - Screenshot: mcp__helme-browser (navigate_page tới http://127.0.0.1:<cổng>/, take_screenshot); ảnh thumbnail YouTube không hiện vì trình duyệt của Helme chặn mạng ngoài.
 - Release: build bằng `npm run dist -- --win --publish never`, rồi `gh release create v<version>` kèm `VideoGrabberSetup-<version>.exe`, `.blockmap`, `latest.yml`, bản portable và `SHA256SUMS.txt`.

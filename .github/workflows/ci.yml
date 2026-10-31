@@ -37,5 +37,5 @@ jobs:
       # "Build" của dự án: `npm run dist` cần Windows, yt-dlp và ffmpeg nên CI không đóng gói thật.
       # Bước này kiểm cú pháp mọi tệp JS, require trỏ tới tệp hoặc gói trong "dependencies", build.files
       # và các tệp css/js mà trang chính gọi (scripts/check-build.js).
-      - run: npm run check:build
+      - run: npm run build
       - run: npm test
