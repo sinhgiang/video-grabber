@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const ytdlp = require('./lib/ytdlp');
 const { getInfo, startDownload, cleanupTmp, sanitizeFilename, SUPPORTED_COOKIE_BROWSERS } = ytdlp;
@@ -139,11 +140,13 @@ app.post('/api/download/start', localOnlyWhenSessions, (req, res) => {
         tmpDir,
         title: path.basename(filePath),
       });
+      expireJob(jobId, FILE_KEEP_MS);
     })
     .catch((err) => {
       console.error('[download]', err && err.message);
       const msg = (err && err.message) || 'Tải thất bại. Video có thể bị giới hạn hoặc đường dẫn không hợp lệ.';
       updateJob(jobId, { status: 'error', error: msg, code: (err && err.code) || undefined, provider: (err && err.provider) || undefined });
+      expireJob(jobId, JOB_AFTER_DONE_MS);
     });
 });
 
@@ -173,17 +176,78 @@ app.get('/api/download/progress/:jobId', localOnlyWhenSessions, (req, res) => {
   req.on('close', () => job.listeners.delete(send));
 });
 
+// ---- Gửi file đã tải về máy người dùng (T-1727) ----
+// Trước đây callback của res.download chỉ ghi log: gặp lỗi (file "..mp4" bị coi là file ẩn → 404) thì
+// yêu cầu không bao giờ được trả lời, giao diện kẹt ở "Đang lưu file…". Nay mọi lỗi đều được trả lời
+// bằng thông báo tiếng Việt và ghi vào job.delivery để giao diện hỏi lại qua /api/download/status.
+const FILE_KEEP_MS = 30 * 60 * 1000; // file tạm chưa được lấy: giữ tối đa 30 phút rồi xoá
+const JOB_AFTER_DONE_MS = 2 * 60 * 1000; // sau khi gửi xong: giữ bản ghi 2 phút để giao diện đọc kết quả
+const MSG_FILE_GONE = 'Không tìm thấy file đã tải (có thể đã hết hạn hoặc bị xoá khỏi thư mục tạm). Hãy bấm Tải xuống lại.';
+
+function expireJob(jobId, ms) {
+  const timer = setTimeout(() => {
+    const job = getJob(jobId);
+    if (!job) return;
+    if (job.delivery === 'sending') return expireJob(jobId, 60 * 1000); // đang gửi: chờ thêm
+    if (job.tmpDir) cleanupTmp(job.tmpDir);
+    removeJob(jobId);
+  }, ms);
+  timer.unref();
+}
+
+function isClientAbort(err, req) {
+  return ['ECONNABORTED', 'ECONNRESET', 'EPIPE'].includes(err && err.code) || req.destroyed === true;
+}
+
 app.get('/api/download/file/:jobId', localOnlyWhenSessions, (req, res) => {
-  const job = getJob(req.params.jobId);
+  const jobId = req.params.jobId;
+  const job = getJob(jobId);
   if (!job || job.status !== 'ready' || !job.filePath) {
     return res.status(404).json({ error: 'File chưa sẵn sàng.' });
   }
 
-  const filename = sanitizeFilename(path.basename(job.filePath));
-  res.download(job.filePath, filename, (err) => {
-    if (err) console.error('[send file]', err);
-    cleanupTmp(job.tmpDir);
-    removeJob(req.params.jobId);
+  fs.stat(job.filePath, (statErr, st) => {
+    if (statErr || !st.isFile()) {
+      updateJob(jobId, { delivery: 'failed', deliveryError: MSG_FILE_GONE });
+      return res.status(410).json({ error: MSG_FILE_GONE });
+    }
+    const filename = sanitizeFilename(path.basename(job.filePath));
+    updateJob(jobId, { delivery: 'sending', deliveryTotal: st.size, deliveryRes: res, deliveryError: undefined });
+    // dotfiles: 'allow' — đường dẫn do chính server tạo (không lấy từ người dùng), nên cho phép tên bắt đầu bằng "."
+    res.download(job.filePath, filename, { dotfiles: 'allow' }, (err) => {
+      updateJob(jobId, { deliveryRes: null });
+      if (!err) {
+        updateJob(jobId, { delivery: 'done' });
+        cleanupTmp(job.tmpDir);
+        return expireJob(jobId, JOB_AFTER_DONE_MS);
+      }
+      if (isClientAbort(err, req)) {
+        // Người dùng huỷ hộp thoại lưu / trình duyệt ngắt: giữ file để bấm lưu lại (hết hạn sau FILE_KEEP_MS)
+        updateJob(jobId, { delivery: 'cancelled' });
+        return;
+      }
+      console.error('[send file]', err);
+      const msg = `Không gửi được file về máy (${err.code || err.message}). Hãy bấm Tải xuống lại.`;
+      updateJob(jobId, { delivery: 'failed', deliveryError: msg });
+      cleanupTmp(job.tmpDir);
+      if (!res.headersSent) res.status(500).json({ error: msg });
+      else res.destroy();
+    });
+  });
+});
+
+// Giao diện hỏi lại để biết file đã về máy chưa (không có cách nào khác biết việc lưu của trình duyệt).
+app.get('/api/download/status/:jobId', localOnlyWhenSessions, (req, res) => {
+  const job = getJob(req.params.jobId);
+  if (!job) return res.status(404).json({ error: 'Phiên tải này đã kết thúc hoặc hết hạn.' });
+  const socket = job.deliveryRes && job.deliveryRes.socket;
+  const sent = socket ? Math.min(job.deliveryTotal || 0, socket.bytesWritten) : undefined;
+  res.json({
+    status: job.status,
+    delivery: job.delivery,
+    sent,
+    total: job.deliveryTotal,
+    error: job.deliveryError || job.error,
   });
 });
 
