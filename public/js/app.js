@@ -20,6 +20,7 @@ const progressWrap = $('#progressWrap');
 const progressFill = $('#progressFill');
 const progressText = $('#progressText');
 const progressStatus = $('#progressStatus');
+const saveLink = $('#saveLink');
 
 const updateBanner = $('#updateBanner');
 const updateBannerText = $('#updateBannerText');
@@ -305,6 +306,29 @@ typeSegmented.addEventListener('click', (e) => {
   qualityGroup.style.display = selectedType === 'mp3' ? 'none' : '';
 });
 
+// Kích hoạt trình duyệt tải file đã chuẩn bị xong về máy.
+function triggerBrowserSave(jobId) {
+  const a = document.createElement('a');
+  a.href = `/api/download/file/${jobId}`;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+// Hỏi server file đã về máy chưa; trình duyệt không báo lại việc lưu nên đây là cách duy nhất biết kết quả.
+function trackSave(jobId, onView) {
+  return VgDelivery.trackDelivery({
+    onView,
+    fetchStatus: async () => {
+      const r = await fetch(`/api/download/status/${jobId}`);
+      let data = null;
+      try { data = await r.json(); } catch { /* không có nội dung JSON */ }
+      return { status: r.status, data };
+    },
+  });
+}
+
 downloadBtn.addEventListener('click', async () => {
   const url = (currentInfo && currentInfo.webpageUrl) || urlInput.value.trim();
   if (!url) {
@@ -319,6 +343,7 @@ downloadBtn.addEventListener('click', async () => {
   progressText.textContent = '0%';
   progressStatus.textContent = 'Đang chuẩn bị…';
   progressStatus.className = '';
+  saveLink.hidden = true;
 
   try {
     const startRes = await fetch('/api/download/start', {
@@ -343,17 +368,19 @@ downloadBtn.addEventListener('click', async () => {
       if (data.status === 'downloading') {
         progressStatus.textContent = data.stage || (data.eta ? `Đang tải… còn khoảng ${data.eta}` : 'Đang tải…');
       } else if (data.status === 'ready') {
-        progressStatus.textContent = '✅ Hoàn tất! Đang lưu file…';
-        progressStatus.className = 'is-ready';
         evtSource.close();
-        // Kích hoạt tải file về máy
-        const a = document.createElement('a');
-        a.href = `/api/download/file/${jobId}`;
-        a.download = '';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
         downloadBtn.disabled = false;
+        saveLink.href = `/api/download/file/${jobId}`;
+        const toneClass = { wait: 'is-ready', ok: 'is-ready', warn: 'is-warn', error: 'is-error' };
+        const showView = (view) => {
+          progressStatus.textContent = view.text;
+          progressStatus.className = toneClass[view.tone] || '';
+          saveLink.hidden = !view.manual;
+        };
+        showView(VgDelivery.describeDelivery({ kind: 'data', data: {} }, 0));
+        // Kích hoạt tải file về máy, rồi theo dõi tới khi biết kết quả (đã lưu / lỗi / cần lưu thủ công)
+        triggerBrowserSave(jobId);
+        trackSave(jobId, showView);
       } else if (data.status === 'error') {
         progressStatus.textContent = '❌ ' + (data.error || 'Có lỗi xảy ra khi tải.');
         progressStatus.className = 'is-error';
@@ -424,6 +451,7 @@ function createQueueRow(url) {
       <span class="queue-item__status">${statusLabel('analyzing')} · 0s</span>
     </div>
     <div class="progress-bar is-indeterminate"><div class="progress-fill" style="width:0%"></div></div>
+    <a class="save-link" href="#" download hidden>⬇ Lưu file</a>
   `;
   batchQueue.prepend(row);
 
@@ -453,6 +481,12 @@ function createQueueRow(url) {
       if (status === 'ready' || status === 'error') clearInterval(ticker);
     },
     setProgress: (pct) => { row.querySelector('.progress-fill').style.width = `${pct}%`; },
+    // Nút "Lưu file" khi trình duyệt không tự nhận file
+    setSaveLink: (href, visible) => {
+      const link = row.querySelector('.save-link');
+      link.href = href;
+      link.hidden = !visible;
+    },
   };
 }
 
@@ -486,14 +520,14 @@ async function processQueueItem(url) {
         const data = JSON.parse(evt.data);
         rowCtl.setProgress(data.progress);
         if (data.status === 'ready') {
-          rowCtl.setStatus('ready');
+          rowCtl.setStatus('ready', VgDelivery.describeDelivery({ kind: 'data', data: {} }, 0).text);
           evtSource.close();
-          const a = document.createElement('a');
-          a.href = `/api/download/file/${jobId}`;
-          a.download = '';
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
+          triggerBrowserSave(jobId);
+          // Cập nhật dòng trạng thái theo kết quả lưu file (không chặn hàng đợi)
+          trackSave(jobId, (view) => {
+            rowCtl.setStatus(view.tone === 'error' ? 'error' : 'ready', view.text);
+            rowCtl.setSaveLink(`/api/download/file/${jobId}`, view.manual);
+          });
           resolve();
         } else if (data.status === 'error') {
           rowCtl.setStatus('error', '❌ ' + (data.error || 'Lỗi tải'));

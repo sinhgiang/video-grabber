@@ -134,6 +134,7 @@ test('app desktop: /api/info và /api/download/* tự dùng phiên đăng nhập
     ['POST', '/api/download/start', body],
     ['GET', '/api/download/progress/abc'],
     ['GET', '/api/download/file/abc'],
+    ['GET', '/api/download/status/abc'], // T-1727: route theo dõi việc lưu file cũng qua chốt Host/Origin
   ]) {
     assert.strictEqual((await call(m, u, { body: b, headers: { Origin: 'https://evil.example' } })).status, 403, `${m} ${u} với Origin lạ`);
     assert.strictEqual((await call(m, u, { body: b, headers: { Host: 'evil.example:3000' } })).status, 403, `${m} ${u} với Host lạ`);

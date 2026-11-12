@@ -22,7 +22,8 @@ module.exports = [
     files: ['public/js/**/*.js'],
     languageOptions: {
       sourceType: 'script',
-      globals: { ...globals.browser },
+      // VgDelivery: do public/js/deliver.js nạp trước app.js (xem public/index.html)
+      globals: { ...globals.browser, VgDelivery: 'readonly' },
     },
   },
   {
